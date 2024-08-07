@@ -1,119 +1,86 @@
-const mongoose = require('mongoose');
-var jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
+const Users = require('../schema/user');
 
-const Users = mongoose.model('Users', {
-    username: String,
-    mobile: String,
-    email: String,
-    password: String,
-    likedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Products' }]
-});
+// Helper function to handle errors
+const handleError = (res, message = 'Server error') => res.status(500).send({ message });
 
-module.exports.likeProducts = (req, res) => {
-    let productId = req.body.productId;
-    let userId = req.body.userId;
+const likeProducts = (req, res) => {
+    const { productId, userId } = req.body;
 
     Users.updateOne({ _id: userId }, { $addToSet: { likedProducts: productId } })
-        .then(() => {
-            res.send({ message: 'liked success.' })
-        })
-        .catch(() => {
-            res.send({ message: 'server err' })
-        })
+        .then(() => res.send({ message: 'Product liked successfully.' }))
+        .catch(() => handleError(res));
+};
 
-}
+const signup = (req, res) => {
+    const { username, password, email, mobile } = req.body;
+    const user = new Users({ username, password, email, mobile });
 
-module.exports.signup = (req, res) => {
-    const username = req.body.username;
-    const password = req.body.password;
-    const email = req.body.email;
-    const mobile = req.body.mobile;
-    const user = new Users({ username: username, password: password, email, mobile });
     user.save()
-        .then(() => {
-            res.send({ message: 'saved success.' })
-        })
-        .catch(() => {
-            res.send({ message: 'server err' })
-        })
+        .then(() => res.send({ message: 'User registered successfully.' }))
+        .catch(() => handleError(res));
+};
 
-}
-
-module.exports.myProfileById = (req, res) => {
-    let uid = req.params.userId
-
-    Users.findOne({ _id: uid })
-        .then((result) => {
-            res.send({
-                message: 'success.', user: {
-                    email: result.email,
-                    mobile: result.mobile,
-                    username: result.username
-                }
-            })
-        })
-        .catch(() => {
-            res.send({ message: 'server err' })
-        })
-
-    return;
-
-}
-
-module.exports.getUserById = (req, res) => {
-    const _userId = req.params.uId;
-    Users.findOne({ _id: _userId })
-        .then((result) => {
-            res.send({
-                message: 'success.', user: {
-                    email: result.email,
-                    mobile: result.mobile,
-                    username: result.username
-                }
-            })
-        })
-        .catch(() => {
-            res.send({ message: 'server err' })
-        })
-}
-
-
-module.exports.login = (req, res) => {
-    const username = req.body.username;
-    const password = req.body.password;
-
-    Users.findOne({ username: username })
-        .then((result) => {
-            if (!result) {
-                res.send({ message: 'user not found.' })
+const myProfileById = (req, res) => {
+    Users.findOne({ _id: req.params.userId })
+        .then(result => {
+            if (result) {
+                const { email, mobile, username } = result;
+                res.send({ message: 'Success', user: { email, mobile, username } });
             } else {
-                if (result.password == password) {
-                    const token = jwt.sign({
-                        data: result
-                    }, 'MYKEY', { expiresIn: '1h' });
-                    res.send({ message: 'find success.', token: token, userId: result._id })
-                }
-                if (result.password != password) {
-                    res.send({ message: 'password wrong.' })
-                }
-
+                res.send({ message: 'User not found.' });
             }
-
         })
-        .catch(() => {
-            res.send({ message: 'server err' })
+        .catch(() => handleError(res));
+};
+
+const getUserById = (req, res) => {
+    Users.findOne({ _id: req.params.uId })
+        .then(result => {
+            if (result) {
+                const { email, mobile, username } = result;
+                res.send({ message: 'Success', user: { email, mobile, username } });
+            } else {
+                res.send({ message: 'User not found.' });
+            }
         })
+        .catch(() => handleError(res));
+};
 
-}
+const login = (req, res) => {
+    const { username, password } = req.body;
 
-module.exports.likedProducts = (req, res) => {
+    Users.findOne({ username })
+        .then(result => {
+            if (!result) {
+                res.send({ message: 'User not found.' });
+            } else if (result.password === password) {
+                const token = jwt.sign({ data: result }, 'MYKEY', { expiresIn: '1h' });
+                res.send({ message: 'Login successful.', token, userId: result._id });
+            } else {
+                res.send({ message: 'Incorrect password.' });
+            }
+        })
+        .catch(() => handleError(res));
+};
 
+const likedProducts = (req, res) => {
     Users.findOne({ _id: req.body.userId }).populate('likedProducts')
-        .then((result) => {
-            res.send({ message: 'success', products: result.likedProducts })
+        .then(result => {
+            if (result) {
+                res.send({ message: 'Success', products: result.likedProducts });
+            } else {
+                res.send({ message: 'User not found.' });
+            }
         })
-        .catch((err) => {
-            res.send({ message: 'server err' })
-        })
+        .catch(() => handleError(res));
+};
 
-}
+module.exports = {
+    likeProducts,
+    signup,
+    myProfileById,
+    getUserById,
+    login,
+    likedProducts
+};

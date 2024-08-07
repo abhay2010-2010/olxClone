@@ -1,140 +1,85 @@
+const Products = require('../schema/product');
 
-const mongoose = require('mongoose');
+// Helper function to handle errors
+const handleError = (res, message = 'Server error') => res.status(500).send({ message });
 
+// Search products
+const searchProducts = (req, res) => {
+    const search = req.query.search || '';
 
-let schema = new mongoose.Schema({
-    pname: String,
-    pdesc: String,
-    price: String,
-    category: String,
-    pimage: String,
-    pimage2: String,
-    addedBy: mongoose.Schema.Types.ObjectId,
-    pLoc: {
-        type: {
-            type: String,
-            enum: ['Point'],
-            default: 'Point'
-        },
-        coordinates: {
-            type: [Number]
-        }
-    }
-})
-
-schema.index({ pLoc: '2dsphere' });
-
-const Products = mongoose.model('Products', schema);
-
-
-module.exports.search = (req, res) => {
-
-    console.log(req.query)
-
-    let latitude = req.query.loc.split(',')[0]
-    let longitude = req.query.loc.split(',')[1]
-
-    let search = req.query.search;
     Products.find({
         $or: [
-            { pname: { $regex: search } },
-            { pdesc: { $regex: search } },
-            { price: { $regex: search } },
-        ],
-        pLoc: {
-            $near: {
-                $geometry: {
-                    type: 'Point',
-                    coordinates: [parseFloat(latitude), parseFloat(longitude)]
-                },
-                $maxDistance: 500 * 1000,
-            }
-
-        }
+            { pname: { $regex: search, $options: 'i' } },
+            { pdesc: { $regex: search, $options: 'i' } },
+            { price: { $regex: search, $options: 'i' } }
+        ]
     })
-        .then((results) => {
-            res.send({ message: 'success', products: results })
-        })
-        .catch((err) => {
-            res.send({ message: 'server err' })
-        })
-}
+    .then(results => res.send({ message: 'Success', products: results }))
+    .catch(() => handleError(res));
+};
 
-module.exports.addProduct = (req, res) => {
+// Add a new product
+const addProduct = (req, res) => {
+    const { pname, pdesc, price, category } = req.body;
+    const pimage = req.files?.pimage ? req.files.pimage[0].path : null;
+    const pimage2 = req.files?.pimage2 ? req.files.pimage2[0].path : null;
 
-    console.log(req.files);
-    console.log(req.body);
-
-
-    const plat = req.body.plat;
-    const plong = req.body.plong;
-    const pname = req.body.pname;
-    const pdesc = req.body.pdesc;
-    const price = req.body.price;
-    const category = req.body.category;
-    const pimage = req.files.pimage[0].path;
-    const pimage2 = req.files.pimage2[0].path;
-    const addedBy = req.body.userId;
-
-    const product = new Products({
-        pname, pdesc, price, category, pimage, pimage2, addedBy, pLoc: {
-            type: 'Point', coordinates: [plat, plong]
-        }
-    });
-    product.save()
-        .then(() => {
-            res.send({ message: 'saved success.' })
-        })
-        .catch(() => {
-            res.send({ message: 'server err' })
-        })
-}
-
-
-module.exports.getProducts = (req, res) => {
-
-    const catName = req.query.catName;
-    let _f = {}
-
-    if (catName) {
-        _f = { category: catName }
+    if (!pname || !pdesc || !price || !category) {
+        return res.status(400).send({ message: 'Missing required fields.' });
     }
 
-    Products.find(_f)
-        .then((result) => {
-            res.send({ message: 'success', products: result })
+    const product = new Products({
+        pname, pdesc, price, category, pimage, pimage2
+    });
 
+    product.save()
+        .then(() => res.send({ message: 'Product saved successfully.' }))
+        .catch(() => handleError(res));
+};
+
+// Get all products with optional category filter
+const getProducts = (req, res) => {
+    const catName = req.query.catName || '';
+    const filter = catName ? { category: catName } : {};
+
+    Products.find(filter)
+        .then(result => res.send({ message: 'Success', products: result }))
+        .catch(() => handleError(res));
+};
+
+// Get a product by ID
+const getProductsById = (req, res) => {
+    const pId = req.params.pId;
+
+    if (!mongoose.Types.ObjectId.isValid(pId)) {
+        return res.status(400).send({ message: 'Invalid product ID.' });
+    }
+
+    Products.findById(pId)
+        .then(result => {
+            if (!result) return res.status(404).send({ message: 'Product not found.' });
+            res.send({ message: 'Success', product: result });
         })
-        .catch((err) => {
-            res.send({ message: 'server err' })
-        })
+        .catch(() => handleError(res));
+};
 
-}
-
-module.exports.getProductsById = (req, res) => {
-    console.log(req.params);
-
-    Products.findOne({ _id: req.params.pId })
-        .then((result) => {
-            res.send({ message: 'success', product: result })
-        })
-        .catch((err) => {
-            res.send({ message: 'server err' })
-        })
-
-}
-
-module.exports.myProducts = (req, res) => {
-
+// Get products added by a specific user (assuming userId is provided in the request body)
+const myProducts = (req, res) => {
     const userId = req.body.userId;
 
+    if (!userId) {
+        return res.status(400).send({ message: 'User ID is required.' });
+    }
+
     Products.find({ addedBy: userId })
-        .then((result) => {
-            res.send({ message: 'success', products: result })
-        })
-        .catch((err) => {
-            res.send({ message: 'server err' })
-        })
+        .then(result => res.send({ message: 'Success', products: result }))
+        .catch(() => handleError(res));
+};
 
-}
-
+module.exports = {
+    searchProducts,
+    addProduct,
+    getProducts,
+    getProductsById,
+    myProducts
+};
