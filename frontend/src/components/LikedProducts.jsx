@@ -1,134 +1,132 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Header from "./Header";
-import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
 import Categories from "./Categories";
 import { FaHeart } from "react-icons/fa";
 import './Home.css';
 import API_URL from "../constants";
+import axios from "axios";
 
+// Debounce function to limit the rate of search operations
+function debounce(func, delay) {
+    let timeoutId;
+    return function (...args) {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func(...args), delay);
+    };
+}
 
 function LikedProducts() {
+    const [products, setProducts] = useState([]);
+    const [filteredProducts, setFilteredProducts] = useState([]);
+    const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const navigate = useNavigate()
+    // Fetch liked products
+    useEffect(() => {
+        const fetchLikedProducts = async () => {
+            try {
+                const url = `${API_URL}/liked-products`;
+                const data = { userId: localStorage.getItem('userId') };
+                const response = await axios.post(url, data);
+                if (response.data.products) {
+                    setProducts(response.data.products);
+                    setFilteredProducts(response.data.products);
+                }
+                setLoading(false);
+            } catch (err) {
+                setError('Server error while fetching liked products.');
+                setLoading(false);
+            }
+        };
 
-    const [products, setproducts] = useState([]);
-    const [cproducts, setcproducts] = useState([]);
-    const [search, setsearch] = useState('');
+        fetchLikedProducts();
+    }, []);
 
-    // useEffect(() => {
-    //     if (!localStorage.getItem('token')) {
-    //         navigate('/login')
-    //     }
-    // }, [])
+    // Handle search input with debouncing
+    const debouncedSearch = useCallback(
+        debounce((value) => {
+            const lowercasedValue = value.toLowerCase();
+            const results = products.filter(item =>
+                item.pname.toLowerCase().includes(lowercasedValue) ||
+                item.pdesc.toLowerCase().includes(lowercasedValue) ||
+                item.category.toLowerCase().includes(lowercasedValue)
+            );
+            setFilteredProducts(results);
+        }, 300),
+        [products]
+    );
 
     useEffect(() => {
-        const url = API_URL + '/liked-products';
-        let data = { userId: localStorage.getItem('userId') }
-        axios.post(url, data)
-            .then((res) => {
-                if (res.data.products) {
-                    setproducts(res.data.products);
-                }
-            })
-            .catch((err) => {
-                alert('Server Err.')
-            })
-    }, [])
+        debouncedSearch(search);
+    }, [search, debouncedSearch]);
 
-    const handlesearch = (value) => {
-        setsearch(value);
+    const handleSearchChange = (value) => {
+        setSearch(value);
+    };
+
+    const handleCategoryChange = (category) => {
+        const results = products.filter(item => item.category === category);
+        setFilteredProducts(results);
+    };
+
+    const handleLike = async (productId) => {
+        const userId = localStorage.getItem('userId');
+        const url = `${API_URL}/like-product`;
+        const data = { userId, productId };
+
+        try {
+            await axios.post(url, data);
+            alert('Liked.');
+        } catch (err) {
+            alert('Server error while liking the product.');
+        }
+    };
+
+    if (loading) {
+        return <p>Loading...</p>;
     }
 
-    const handleClick = () => {
-        let filteredProducts = products.filter((item) => {
-            if (item.pname.toLowerCase().includes(search.toLowerCase()) ||
-                item.pdesc.toLowerCase().includes(search.toLowerCase()) ||
-                item.category.toLowerCase().includes(search.toLowerCase())) {
-                return item;
-            }
-        })
-        setcproducts(filteredProducts)
-
+    if (error) {
+        return <p>{error}</p>;
     }
-
-    const handleCategory = (value) => {
-        let filteredProducts = products.filter((item, index) => {
-            if (item.category == value) {
-                return item;
-            }
-        })
-        setcproducts(filteredProducts)
-    }
-
-    const handleLike = (productId) => {
-        let userId = localStorage.getItem('userId');
-
-        const url = API_URL + '/like-product';
-        const data = { userId, productId }
-        axios.post(url, data)
-            .then((res) => {
-                if (res.data.message) {
-                    alert('Liked.')
-                }
-            })
-            .catch((err) => {
-                alert('Server Err.')
-            })
-
-    }
-
 
     return (
         <div>
-            <Header search={search} handlesearch={handlesearch} handleClick={handleClick} />
-            <Categories handleCategory={handleCategory} />
-            <h5> SEARCH RESULTS </h5>
+            <Header search={search} handlesearch={handleSearchChange} handleClick={() => { }} />
+            <Categories handleCategory={handleCategoryChange} />
+
+            <h5>SEARCH RESULTS</h5>
             <div className="d-flex justify-content-center flex-wrap">
-                {cproducts && products.length > 0 &&
-                    cproducts.map((item, index) => {
-
-                        return (
-                            <div key={item._id} className="card m-3 ">
-                                <div onClick={() => handleLike(item._id)} className="icon-con">
-                                    <FaHeart className="icons" />
-                                </div>
-                                <img width="300px" height="200px" src={API_URL + '/' + item.pimage} />
-
-                                <p className="m-2"> {item.pname}  | {item.category} </p>
-                                <h3 className="m-2 text-danger"> {item.price} </h3>
-                                <p className="m-2 text-success"> {item.pdesc} </p>
-                            </div>
-                        )
-
-                    })}
+                {filteredProducts.map(item => (
+                    <div key={item._id} className="card m-3">
+                        <div onClick={() => handleLike(item._id)} className="icon-con">
+                            <FaHeart className="icons" />
+                        </div>
+                        <img width="300px" height="200px" src={`${API_URL}/${item.pimage}`} alt={item.pname} />
+                        <p className="m-2">{item.pname} | {item.category}</p>
+                        <h3 className="m-2 text-danger">Rs. {item.price}</h3>
+                        <p className="m-2 text-success">{item.pdesc}</p>
+                    </div>
+                ))}
             </div>
 
-            <h5> ALL RESULTS  </h5>
-
+            <h5>ALL RESULTS</h5>
             <div className="d-flex justify-content-center flex-wrap">
-                {products && products.length > 0 &&
-                    products.map((item, index) => {
-
-                        return (
-                            <div key={item._id} className="card m-3 ">
-                                <div onClick={() => handleLike(item._id)} className="icon-con">
-                                    <FaHeart className="icons" />
-                                </div>
-                                <img width="300px" height="200px" src={API_URL + '/' + item.pimage} />
-                                <p className="m-2"> {item.pname}  | {item.category} </p>
-                                <h3 className="m-2 text-danger"> {item.price} </h3>
-                                <p className="m-2 text-success"> {item.pdesc} </p>
-                            </div>
-                        )
-
-                    })}
+                {products.map(item => (
+                    <div key={item._id} className="card m-3">
+                        <div onClick={() => handleLike(item._id)} className="icon-con">
+                            <FaHeart className="icons" />
+                        </div>
+                        <img width="300px" height="200px" src={`${API_URL}/${item.pimage}`} alt={item.pname} />
+                        <p className="m-2">{item.pname} | {item.category}</p>
+                        <h3 className="m-2 text-danger">Rs. {item.price}</h3>
+                        <p className="m-2 text-success">{item.pdesc}</p>
+                    </div>
+                ))}
             </div>
-
-
-
         </div>
-    )
+    );
 }
 
 export default LikedProducts;
