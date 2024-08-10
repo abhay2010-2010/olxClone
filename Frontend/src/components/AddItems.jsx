@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Button, Input, FormControl, FormLabel, Box, Text, Select, useToast, Textarea, Grid } from "@chakra-ui/react";
 import Navbar from "./Navbar";
-import url from "./vars";
+
 import { useNavigate } from "react-router-dom";
 import Footer from "./Footer";
+
+
 
 const AddItems = () => {
   const [name, setName] = useState("");
@@ -14,7 +16,7 @@ const AddItems = () => {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [message, setMessage] = useState("");
-  const URL = url;
+  const URL = "https://olxclone-6.onrender.com";
   const toast = useToast();
   const navigate = useNavigate();
 

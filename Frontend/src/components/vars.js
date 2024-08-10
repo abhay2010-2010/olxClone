@@ -1,2 +1,2 @@
-let url = "https://olxclone-6.onrender.com"; 
+let url = import.meta.env.VITE_DEPLOYED_URL;
 export default url;

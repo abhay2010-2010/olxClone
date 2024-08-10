@@ -14,7 +14,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import timeAgo from "./timeAgo";
 
-
 const Container = ({ items, loading }) => {
   const URL ="https://olxclone-6.onrender.com";
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,6 +67,7 @@ const Container = ({ items, loading }) => {
           objectFit="cover"
           borderRadius="md"
           mb={3}
+        
         />
         <Box textAlign="center">
           <Text fontSize="sm" color="gray.600" mb={2}>
