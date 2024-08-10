@@ -13,13 +13,14 @@ import {
 } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
 import timeAgo from "./timeAgo";
-import url from "./vars";
+
 
 const Container = ({ items, loading }) => {
-  const URL = url;
+  const URL ="https://olxclone-6.onrender.com";
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
   const navigate = useNavigate();
+
 
 
   const indexOfLastItem = currentPage * itemsPerPage;
